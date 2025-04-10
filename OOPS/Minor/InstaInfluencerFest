@@ -1,0 +1,364 @@
+#include <bits/stdc++.h>
+#define ll long long int
+using namespace std;
+
+ll n, m;
+vector<ll>events;
+map<ll,vector<ll>> edges;
+
+ll num_of_SCC=0,maxSCCSize=0;
+map<ll,ll>sccHysc;
+
+class startGraph{
+public:
+    void start(){
+        cin>>n>>m;
+        events.resize(n+1);
+        for (size_t i=1;i<=(size_t)n;i++) {
+            cin>>events[i];
+        }
+        for (size_t i=1;i<=(size_t)n;i++) {
+            edges[i];
+        }
+        for(size_t i=0;i<(size_t)m;i++) {
+            ll x,y;
+            cin>>x>>y;
+            edges[x].push_back(y);
+        }
+    }
+};
+
+class GraphAlgorithm{
+public:
+    virtual void query(){}
+};
+
+class isCycle :public GraphAlgorithm {
+private:
+    bool checkCycle(ll a,vector<ll>&visited,vector<ll>&pathChecker) {
+        visited[a]=pathChecker[a]=1;
+        for (size_t it = 0;it<edges[a].size();++it) {
+            ll neighbor=edges[a][it];
+            if (!visited[neighbor]){
+                if(checkCycle(neighbor,visited,pathChecker)) {
+                    return true;
+                }
+            }
+            if(pathChecker[neighbor]){
+                return true;
+            }
+        }
+        pathChecker[a]=0;
+        return false;
+    }
+
+public:
+    void query(){
+        vector<ll>visited(n+1,0);
+        vector<ll>pathChecker(n+1,0);
+        for(size_t i = 1;i<=(size_t)n;i++) {
+            if (!visited[i]){
+                if(checkCycle(i,visited,pathChecker)) {
+                    cout<<"YES"<<endl;
+                    return;
+                }
+            }
+        }
+        cout <<"NO"<< endl;
+    }
+};
+
+class indepComponent:public GraphAlgorithm{
+    private:
+        vector<ll>mark;
+        stack<ll>order;
+        map<ll,vector<ll>>reverseGraph;
+    
+        void forwardDFS(ll node){
+            mark[node]=1;
+            for(size_t idx=0;idx<edges[node].size();++idx){
+                ll neighbor=edges[node][idx];
+                if(!mark[neighbor]){
+                    forwardDFS(neighbor);
+                }
+            }
+            order.push(node);
+        }
+    
+        void backwardDFS(ll node,ll label,vector<ll>&cluster){
+            mark[node]=1;
+            cluster.push_back(node);
+            SCClabel[node]=label;
+            for(size_t idx=0;idx<reverseGraph[node].size();++idx){
+                ll neighbor=reverseGraph[node][idx];
+                if(!mark[neighbor]){
+                    backwardDFS(neighbor,label,cluster);
+                }
+            }
+        }
+    
+    public:
+        map<ll,ll>SCClabel;
+        map<ll,ll>sccHysc;
+    
+        void computeSCCs(){
+            mark.assign(n+1,0);
+            while(!order.empty())order.pop();
+    
+            for(ll nodeID=1;nodeID<=n;++nodeID){
+                if(!mark[nodeID]){
+                    forwardDFS(nodeID);
+                }
+            }
+    
+            reverseGraph.clear();
+            for(auto itr=edges.begin();itr!=edges.end();++itr){
+                ll fromNode=itr->first;
+                for(size_t idx=0;idx<itr->second.size();++idx){
+                    ll toNode=itr->second[idx];
+                    reverseGraph[toNode].push_back(fromNode);
+                }
+            }
+    
+            mark.assign(n+1,0);
+            num_of_SCC=0;
+            maxSCCSize=0;
+            sccHysc.clear();
+            SCClabel.clear();
+    
+            while(!order.empty()){
+                ll topNode=order.top();
+                order.pop();
+                if(!mark[topNode]){
+                    vector<ll>currentSCC;
+                    num_of_SCC++;
+                    backwardDFS(topNode,num_of_SCC,currentSCC);
+    
+                    ll totalHype=0;
+                    for(size_t idx=0;idx<currentSCC.size();++idx){
+                        totalHype+=events[currentSCC[idx]];
+                    }
+                    sccHysc[num_of_SCC]=totalHype;
+    
+                    if(currentSCC.size()>(size_t)maxSCCSize){
+                        maxSCCSize=currentSCC.size();
+                    }
+                }
+            }
+        }
+    
+        void query(){
+            if(sccHysc.size()==0){
+                computeSCCs();
+            }
+            cout<<num_of_SCC<<" "<<maxSCCSize<<endl;
+        }
+    };
+
+class validOrder:public GraphAlgorithm{
+public:
+    void query(){
+        map<ll,ll>indegree;
+        for(size_t i=1;i<=(size_t)n;i++) {
+            indegree[i]=0;
+        }
+        for(auto x=edges.begin();x!=edges.end();++x) {
+            for(size_t y=0;y<x->second.size();++y) {
+                indegree[x->second[y]]++;
+            }
+        }
+        priority_queue<ll,vector<ll>,greater<ll>>pq;
+        for(auto x=indegree.begin();x!=indegree.end();++x) {
+            if(x->second==0){
+                pq.push(x->first);
+            }
+        }
+        vector<ll>topo;
+        while (!pq.empty()) {
+            ll cur=pq.top();
+            pq.pop();
+            topo.push_back(cur);
+            for (size_t y=0;y<edges[cur].size();++y) {
+                indegree[edges[cur][y]]--;
+                if (indegree[edges[cur][y]]==0) {
+                    pq.push(edges[cur][y]);
+                }
+            }
+        }
+        if(topo.size()!=indegree.size()) {
+            cout<<"NO"<<endl;
+        }else{
+            for(size_t i=0;i<topo.size();i++) {
+                cout<<topo[i]<<" ";
+            }
+            cout<<endl;
+        }
+    }
+};
+
+class maxHype:public GraphAlgorithm{
+    private:
+        vector<ll>mark;
+        stack<ll>order;
+        map<ll,vector<ll>>reverseGraph;
+        map<ll,ll>SCClabel;
+        map<ll,ll>sccHype;
+        map<ll,vector<ll>>compactGraph;
+        map<ll,ll>incoming;
+    
+        void forwardDFS(ll node){
+            mark[node]=1;
+            for(size_t idx=0;idx<edges[node].size();++idx){
+                ll neighbor=edges[node][idx];
+                if(!mark[neighbor]){
+                    forwardDFS(neighbor);
+                }
+            }
+            order.push(node);
+        }
+    
+        void backwardDFS(ll node,ll label,vector<ll>&cluster){
+            mark[node]=1;
+            cluster.push_back(node);
+            SCClabel[node]=label;
+            for(size_t idx=0;idx<reverseGraph[node].size();++idx){
+                ll neighbor=reverseGraph[node][idx];
+                if(!mark[neighbor]){
+                    backwardDFS(neighbor,label,cluster);
+                }
+            }
+        }
+    
+        void computeSCCs(){
+            mark.assign(n+1,0);
+            while(!order.empty()){
+                order.pop();
+            }
+    
+            for(ll nodeID=1;nodeID<=n;++nodeID){
+                if(!mark[nodeID]){
+                    forwardDFS(nodeID);
+                }
+            }
+    
+            reverseGraph.clear();
+            for(auto itr=edges.begin();itr!=edges.end();++itr){
+                ll fromNode=itr->first;
+                for(size_t idx=0;idx<itr->second.size();++idx){
+                    ll toNode=itr->second[idx];
+                    reverseGraph[toNode].push_back(fromNode);
+                }
+            }
+    
+            mark.assign(n+1,0);
+            SCClabel.clear();
+            sccHype.clear();
+    
+            while(!order.empty()){
+                ll topNode=order.top();
+                order.pop();
+                if(!mark[topNode]){
+                    vector<ll>currentSCC;
+                    ll label=SCClabel.size()+1;
+                    backwardDFS(topNode,label,currentSCC);
+                    ll totalHype=0;
+                    for(size_t idx=0;idx<currentSCC.size();++idx){
+                        totalHype+=events[currentSCC[idx]];
+                    }
+                    sccHype[label]=totalHype;
+                }
+            }
+        }
+    
+        void buildCompactGraph(){
+            compactGraph.clear();
+            incoming.clear();
+            set<pair<ll,ll>>edgeSeen;
+            for(auto itr=edges.begin();itr!=edges.end();++itr){
+                ll u=itr->first;
+                ll uSCC=SCClabel[u];
+                for(size_t idx=0;idx<itr->second.size();++idx){
+                    ll v=itr->second[idx];
+                    ll vSCC=SCClabel[v];
+                    if(uSCC!=vSCC){
+                        if(edgeSeen.count({uSCC,vSCC})==0){
+                            compactGraph[uSCC].push_back(vSCC);
+                            incoming[vSCC]++;
+                            edgeSeen.insert({uSCC,vSCC});
+                        }
+                    }
+                }
+            }
+        }
+    
+    public:
+        void query(){
+            if(sccHype.size()==0){
+                computeSCCs();
+            }
+
+            buildCompactGraph();
+    
+            map<ll,ll>dpScore;
+            queue<ll>pending;
+            for(auto itr=sccHype.begin();itr!=sccHype.end();++itr){
+                dpScore[itr->first]=itr->second;
+                if(incoming[itr->first]==0){
+                    pending.push(itr->first);
+                }
+            }
+    
+            ll peakHype=0;
+            while(!pending.empty()){
+                ll curr=pending.front();
+                pending.pop();
+                peakHype=max(peakHype,dpScore[curr]);
+                for(size_t idx=0;idx<compactGraph[curr].size();++idx){
+                    ll neighbor=compactGraph[curr][idx];
+                    if(dpScore[neighbor]<dpScore[curr]+sccHype[neighbor]){
+                        dpScore[neighbor]=dpScore[curr]+sccHype[neighbor];
+                    }
+                    incoming[neighbor]--;
+                    if(incoming[neighbor]==0){
+                        pending.push(neighbor);
+                    }
+                }
+            }
+            cout<<peakHype<<endl;
+        }
+    };
+    
+
+    
+    
+
+int main() {
+    startGraph sG;
+    sG.start();
+
+    indepComponent iC;
+
+    ll q;
+    cin>>q;
+    for(size_t i=0;i<(size_t)q;i++){
+        ll queryType;
+        cin>>queryType;
+
+        if(queryType==1) {
+            isCycle cycleDetector;
+            cycleDetector.query();
+        } else if(queryType==2) {
+            iC.query();
+        } else if(queryType==3) {
+            validOrder vO;
+            vO.query();
+        } else if(queryType==4) {
+            maxHype mH;
+            mH.query();
+        } else {
+            break;
+        }
+    }
+
+    return 0;
+}
