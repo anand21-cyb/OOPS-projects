@@ -1,0 +1,400 @@
+#include <iostream>
+#include <vector>
+#include <iomanip>
+#include <string>
+#include <algorithm>
+using namespace std;
+#define ll long long int
+#define db long double
+
+template<typename poly>
+class compx{
+    public:
+        poly real_part;
+        poly imag_part;
+
+        compx(poly z_val=0) : real_part(z_val), imag_part(0) {}
+        compx(poly r_val,poly i_val) : real_part(r_val), imag_part(i_val) {}
+
+        compx operator*(const compx<poly>& rhs) const 
+        {
+            return compx(real_part*rhs.real_part-imag_part*rhs.imag_part, 
+                        real_part*rhs.imag_part+imag_part*rhs.real_part);
+        }
+        
+        compx operator+(const compx<poly>& rhs) const 
+        {
+            return compx(real_part+rhs.real_part, imag_part+rhs.imag_part);
+        }
+        
+        compx operator-(const compx<poly>& rhs) const 
+        {
+            return compx(real_part-rhs.real_part, imag_part-rhs.imag_part);
+        }
+        
+        compx& operator+=(const compx<poly>& rhs) 
+        {
+            real_part+=rhs.real_part;
+            imag_part+=rhs.imag_part;
+            return *this;
+        }
+        
+        compx& operator-=(const compx<poly>& rhs) 
+        {
+            real_part-=rhs.real_part;
+            imag_part-=rhs.imag_part;
+            return *this;
+        }
+
+        bool operator==(const compx<poly>& rhs) const 
+        {
+            return real_part==rhs.real_part && imag_part==rhs.imag_part;
+        }
+
+        bool operator==(const poly& rhs) const 
+        {
+            return real_part==rhs && imag_part==0;
+        }
+};
+
+template<typename T>
+vector<T> karatsubaRecursive(const vector<T>& polyA, const vector<T>& polyB) 
+{
+    const size_t lenA=polyA.size(), lenB=polyB.size();
+    if(min(lenA,lenB)<=16) 
+    {
+        vector<T> res_poly(lenA+lenB-1,0);
+        for(size_t idx1=0;idx1<lenA;++idx1) 
+        {
+            for(size_t idx2=0;idx2<lenB;++idx2) 
+            {
+                res_poly[idx1+idx2]+=polyA[idx1]*polyB[idx2];
+            }
+        }
+        return res_poly;
+    }
+
+    const size_t half_len=max(lenA,lenB)/2;
+    
+    vector<T> A_low(polyA.begin(),polyA.begin()+min(lenA,half_len));
+    vector<T> A_high(polyA.begin()+min(lenA,half_len),polyA.end());
+    vector<T> B_low(polyB.begin(),polyB.begin()+min(lenB,half_len));
+    vector<T> B_high(polyB.begin()+min(lenB,half_len),polyB.end());
+
+    vector<T> P0=karatsubaRecursive(A_low,B_low);
+    vector<T> P1=karatsubaRecursive(A_high,B_high);
+
+    vector<T> A_sum(A_low);
+    vector<T> B_sum(B_low);
+    for(size_t pos=0;pos<min(A_high.size(),A_sum.size());++pos) 
+    {
+        A_sum[pos]+=A_high[pos];
+    }
+    if(A_high.size()>A_low.size()) 
+    {
+        A_sum.insert(A_sum.end(),A_high.begin()+A_low.size(),A_high.end());
+    }
+    
+    for(size_t pos=0;pos<min(B_high.size(),B_sum.size());++pos) 
+    {
+        B_sum[pos]+=B_high[pos];
+    }
+    if(B_high.size()>B_low.size()) 
+    {
+        B_sum.insert(B_sum.end(),B_high.begin()+B_low.size(),B_high.end());
+    }
+
+    vector<T> P2=karatsubaRecursive(A_sum,B_sum);
+
+    vector<T> final_poly(lenA+lenB-1,0);
+    for(size_t pos=0;pos<P0.size();++pos) final_poly[pos]+=P0[pos];
+    for(size_t pos=0;pos<P1.size();++pos) final_poly[pos+2*half_len]+=P1[pos];
+    for(size_t pos=0;pos<P2.size();++pos) 
+    {
+        if(pos<P0.size()) final_poly[pos+half_len]+=P2[pos]-P0[pos];
+        if(pos<P1.size()) final_poly[pos+half_len]-=P1[pos];
+    }
+    
+    return final_poly;
+}
+
+template<typename poly>
+class polyMultiplication{   
+    public:
+        vector<poly> poly_data;
+
+        polyMultiplication(const vector<poly>& input_poly) : poly_data(input_poly) {}
+
+        const vector<poly>& getvector() const { return poly_data; }
+
+        vector<poly> karatsuba(const vector<poly>& polyA,const vector<poly>& polyB) const 
+        {
+            return karatsubaRecursive(polyA,polyB);
+        }
+    
+        polyMultiplication operator*(const polyMultiplication& rhs) const 
+        {
+            return polyMultiplication(karatsuba(poly_data,rhs.poly_data));
+        }
+};
+
+template<typename poly>
+class polyEvaluation{
+    const vector<poly> poly_coeffs;
+    const ll eval_point;
+
+    public:
+        polyEvaluation(const vector<poly>& coeffs, ll point) : poly_coeffs(coeffs), eval_point(point) {}
+
+        poly Evaluation() const 
+        {
+            poly result_val=0;
+            for(auto coeff_iter=poly_coeffs.rbegin();coeff_iter!=poly_coeffs.rend();++coeff_iter) 
+            {
+                result_val=result_val*eval_point+*coeff_iter;
+            }
+            return result_val;
+        }
+};
+
+template<>
+class polyEvaluation<string>{
+    const vector<string> str_poly;
+    const ll str_eval_point;
+
+    public:
+        polyEvaluation(const vector<string>& str_input, ll str_point) : str_poly(str_input), str_eval_point(str_point) {}
+
+        string Evaluation() const 
+        {
+            string concat_result;
+            const ll poly_degree=str_poly.size();
+            
+            for(ll deg_idx=poly_degree-1;deg_idx>=0;--deg_idx) 
+            {
+                ll repeat_cnt=1;
+                for(ll pow_idx=0;pow_idx<deg_idx;++pow_idx) 
+                {
+                    repeat_cnt*=str_eval_point;
+                }
+                for(ll rep_idx=0;rep_idx<repeat_cnt;++rep_idx) 
+                {
+                    concat_result+=str_poly[deg_idx];
+                }
+            }
+            
+            return concat_result;
+        }
+};
+
+template<typename poly>
+class polyDifferentiation{
+    const vector<poly> diff_poly;
+
+    public:
+        polyDifferentiation(const vector<poly>& input_poly) : diff_poly(input_poly) {}
+
+        vector<poly> diff() const 
+        {
+            vector<poly> derivative;
+            if(diff_poly.size()<=1) return derivative;
+            derivative.reserve(diff_poly.size()-1);
+            for(size_t term_idx=1;term_idx<diff_poly.size();++term_idx) 
+            {
+                derivative.push_back(diff_poly[term_idx]*static_cast<poly>(term_idx));
+            }
+            return derivative;
+        }
+};
+
+template<>
+class polyDifferentiation<compx<ll>>{
+    const vector<compx<ll>> cmplx_poly;
+
+    public:
+        polyDifferentiation(const vector<compx<ll>>& input_poly) : cmplx_poly(input_poly) {}
+
+        vector<compx<ll>> diff() const 
+        {
+            vector<compx<ll>> cmplx_derivative;
+            if(cmplx_poly.size()<=1) return cmplx_derivative;
+            cmplx_derivative.reserve(cmplx_poly.size()-1);
+            for(size_t cmplx_idx=1;cmplx_idx<cmplx_poly.size();++cmplx_idx) 
+            {
+                cmplx_derivative.emplace_back(cmplx_poly[cmplx_idx].real_part*cmplx_idx,cmplx_poly[cmplx_idx].imag_part*cmplx_idx);
+            }
+            return cmplx_derivative;
+        }
+};
+
+int main() 
+{    
+    ll query_count;
+    cin>>query_count;
+    
+    while(query_count--) 
+    {
+        ll operation;
+        cin>>operation;
+
+        if(operation==1) 
+        {
+            string poly_type;
+            cin>>poly_type;
+
+            ll degree1;
+            cin>>degree1;
+            
+            if(poly_type=="integer") 
+            {
+                vector<ll> int_poly1(degree1);
+                for(ll poly_idx=0;poly_idx<degree1;++poly_idx) 
+                {
+                    cin>>int_poly1[poly_idx];
+                }
+
+                ll degree2;
+                cin>>degree2;
+                vector<ll> int_poly2(degree2);
+                for(ll poly_idx=0;poly_idx<degree2;++poly_idx) 
+                {
+                    cin>>int_poly2[poly_idx];
+                }
+
+                auto int_result=(polyMultiplication<ll>(int_poly1)*polyMultiplication<ll>(int_poly2)).getvector();
+                for(size_t res_idx=0;res_idx<int_result.size();++res_idx) 
+                {
+                    cout<<int_result[res_idx]<<" ";
+                }
+                cout<<"\n";
+            }
+            else if(poly_type=="float") 
+            {
+                vector<db> float_poly1(degree1);
+                for(ll poly_idx=0;poly_idx<degree1;++poly_idx) 
+                {
+                    cin>>float_poly1[poly_idx];
+                }
+
+                ll degree2;
+                cin>>degree2;
+                vector<db> float_poly2(degree2);
+                for(ll poly_idx=0;poly_idx<degree2;++poly_idx) 
+                {
+                    cin>>float_poly2[poly_idx];
+                }
+
+                auto float_result=(polyMultiplication<db>(float_poly1)*polyMultiplication<db>(float_poly2)).getvector();
+                cout<<fixed<<setprecision(6);
+                for(size_t res_idx=0;res_idx<float_result.size();++res_idx) 
+                {
+                    cout<<float_result[res_idx]<<" ";
+                }
+                cout<<"\n";
+            }
+            else if(poly_type=="complex") 
+            {
+                vector<compx<ll>> cmplx_poly1(degree1);
+                for(ll poly_idx=0;poly_idx<degree1;++poly_idx) 
+                {
+                    cin>>cmplx_poly1[poly_idx].real_part>>cmplx_poly1[poly_idx].imag_part;
+                }
+
+                ll degree2;
+                cin>>degree2;
+                vector<compx<ll>> cmplx_poly2(degree2);
+                for(ll poly_idx=0;poly_idx<degree2;++poly_idx) 
+                {
+                    cin>>cmplx_poly2[poly_idx].real_part>>cmplx_poly2[poly_idx].imag_part;
+                }
+
+                auto cmplx_result=(polyMultiplication<compx<ll>>(cmplx_poly1)*polyMultiplication<compx<ll>>(cmplx_poly2)).getvector();
+                for(size_t res_idx=0;res_idx<cmplx_result.size();++res_idx) 
+                {
+                    cout<<cmplx_result[res_idx].real_part<<" "<<cmplx_result[res_idx].imag_part<<" ";
+                }
+                cout<<"\n";
+            }
+        }
+        else if(operation==2) 
+        {
+            string eval_type;
+            cin>>eval_type;
+            ll eval_degree;
+            cin>>eval_degree;
+
+            if(eval_type=="integer") 
+            {
+                vector<ll> int_eval_poly(eval_degree);
+                for(ll eval_idx=0;eval_idx<eval_degree;++eval_idx) 
+                {
+                    cin>>int_eval_poly[eval_idx];
+                }
+                ll eval_point;
+                cin>>eval_point;
+                cout<<polyEvaluation<ll>(int_eval_poly,eval_point).Evaluation()<<"\n";
+            }
+            else if(eval_type=="string") 
+            {
+                vector<string> str_eval_poly(eval_degree);
+                for(ll eval_idx=0;eval_idx<eval_degree;++eval_idx) 
+                {
+                    cin>>str_eval_poly[eval_idx];
+                }
+                ll str_eval_point;
+                cin>>str_eval_point;
+                cout<<polyEvaluation<string>(str_eval_poly,str_eval_point).Evaluation()<<"\n";
+            }
+            else 
+            {
+                vector<db> float_eval_poly(eval_degree);
+                for(ll eval_idx=0;eval_idx<eval_degree;++eval_idx) 
+                {
+                    cin>>float_eval_poly[eval_idx];
+                }
+                db float_eval_point;
+                cin>>float_eval_point;
+                cout<<fixed<<setprecision(6)<<polyEvaluation<db>(float_eval_poly,float_eval_point).Evaluation()<<"\n";
+            }
+        }
+        else if(operation==3) 
+        {
+            string diff_type;
+            cin>>diff_type;
+            ll diff_degree;
+            cin>>diff_degree;
+
+            if(diff_type=="integer") 
+            {
+                vector<ll> int_diff_poly(diff_degree);
+                for(ll diff_idx=0;diff_idx<diff_degree;++diff_idx) 
+                {
+                    cin>>int_diff_poly[diff_idx];
+                }
+                auto int_derivative=polyDifferentiation<ll>(int_diff_poly).diff();
+                for(size_t deriv_idx=0;deriv_idx<int_derivative.size();++deriv_idx) 
+                {
+                    cout<<int_derivative[deriv_idx]<<" ";
+                }
+                cout<<"\n";
+            }
+            else 
+            {
+                vector<db> float_diff_poly(diff_degree);
+                for(ll diff_idx=0;diff_idx<diff_degree;++diff_idx) 
+                {
+                    cin>>float_diff_poly[diff_idx];
+                }
+                auto float_derivative=polyDifferentiation<db>(float_diff_poly).diff();
+                cout<<fixed<<setprecision(6);
+                for(size_t deriv_idx=0;deriv_idx<float_derivative.size();++deriv_idx) 
+                {
+                    cout<<float_derivative[deriv_idx]<<" ";
+                }
+                cout<<"\n";
+            }
+        }
+    }
+    
+    return 0;
+}
